@@ -1,5 +1,4 @@
 require_relative '../../lib/measurement'
-require_relative '../../lib/uncertainty_component'
 require_relative 'ea_uncertainty_examples'
 
 describe Measurement do
