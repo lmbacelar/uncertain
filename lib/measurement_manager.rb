@@ -1,30 +1,28 @@
-class Measurement
-  
-  attr_accessor :uy, :vef, :k, :uexp, :components
-
-  def initialize args = nil
-    if args
-      args.each { |k,v| instance_variable_set("@#{k}", v) unless v.nil? }
-    end
+class MeasurementManager
+  def self.uy(data)
+    Math.sqrt(data.map{ |d| (d.c*d.ux)**2 }.inject(:+))
   end
 
-  def compute
-    Marshal.load(Marshal.dump(self)).compute!
+  def self.vef(data)
+    (self.uy(data)**4/(data.map{ |d| (d.c*d.ux)**4/d.v }.inject(:+)))
   end
 
-  def compute!
-    self.uy = Math.sqrt(components.map{ |c| (c.c*c.ux)**2 }.inject(:+))
-    self.vef = (self.uy**4/(components.map{ |c| c.ux**4/c.v }.inject(:+))).to_i
-    self.k = Measurement.k_factor(self.vef)
-    self.uexp = self.k * self.uy
-    self
+  def self.k(data)
+    self.inverse_t_95(self.vef(data))
+  end
+
+  def self.uexp(data)
+    self.k(data) * self.uy(data)
   end
 
 private
-  def self.k_factor(v)
+  def self.inverse_t_95(v)
     # Determines k factor for an inverse Student's t distribution, with 95.45% coverage factor
     #
     # TODO: Link this to statistics package (CRAN-R + RSERVE ?) to generalize this
+
+    return 2 if v == Float::INFINITY
+
     case v.to_i
     when 1 then 13.97
     when 2 then 4.53

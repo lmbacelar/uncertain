@@ -1,5 +1,5 @@
 When /^I provide some measurement data$/ do
-  measurement = Measurement.new(data)
+  measurement = MeasurementManager.compute
 end
 
 Then /^I should get a measurement result$/ do
