@@ -4,21 +4,76 @@ class MeasurementManager
   end
 
   def self.vef(data)
-    (self.uy(data)**4/(data.map{ |d| (d.c*d.ux)**4/d.v }.inject(:+)))
+    (uy(data)**4/(data.map{ |d| (d.c*d.ux)**4/d.v }.inject(:+)))
   end
 
   def self.k(data)
-    self.inverse_t_95(self.vef(data))
+    if (u = dominant(data))
+      divisor_for(u.dist) * 0.95
+    elsif (a = two_rect_dominants(data))
+      beta = ((a[0].c * a[0].ux)-(a[1].c * a[1].ux)).abs/((a[0].c * a[0].ux) + (a[1].c * a[1].ux))
+      (1-Math.sqrt((1-0.95)*(1-beta**2)))/Math.sqrt((1+beta**2)/6)
+    else
+      inverse_t_95(vef(data))
+    end
   end
 
   def self.uexp(data)
-    self.k(data) * self.uy(data)
+    k(data) * uy(data)
   end
 
 private
+  def self.dominant(data)
+    # Sums squares of all cx.ux but ci.ui, then computes sqrt.
+    # Checks if ratio of this to sqrt(ci.ui)² is smaller than 0.35.
+    # Return u if this holds, nil otherwise.
+    # NOTE: EA-4/02 defines this condition do be less than or equal to 0.3
+    #       This number is defined with one significant figure.
+    #       This makes the condition equal to less than 0.35, which will be
+    #       rounded down to 0.3.
+    #       This is according results of example S11, which would not hold
+    #       otherwise.
+    #
+    # TODO: Change return value from nil to something else
+    data.each do |u|
+      u1 = (u.c*u.ux)**2
+      ur = data.map{ |ui| (ui.c*ui.ux)**2 }.inject(:+) - u1
+      return u if Math.sqrt(ur)/Math.sqrt(u1) < 0.35
+    end
+    nil
+  end
+
+  def self.two_rect_dominants(data)
+    # If the two largest are rectangular and combination is dominant
+    # return them. Nil otherwise.
+    #
+    # TODO: Change return value from nil to something else
+    # TODO: Appears to run twice on each iteration. Find out why.
+    #
+    # Get the index of the two largest c*ux. a[0] and a[1]
+    a = data.each_with_index.map{ |d, i| [d.c * d.ux, i] }.sort[-2,2].map{ |i| i[1] }
+    if data[a[0]].dist == 'R' && data[a[1]].dist == 'R'
+      u0 = a.map{ |i| (data[i].c*data[i].ux)**2 }.inject(:+)
+      ur = data.map{ |ui| (ui.c*ui.ux)**2 }.inject(:+) - u0
+      if Math.sqrt(ur)/Math.sqrt(u0) < 0.35
+        [data[a[0]], data[a[1]]]
+      end
+    end 
+  end
+
+  def self.divisor_for(distribution)
+    case distribution
+    when 'R' then Math.sqrt(3)
+    when 'T' then Math.sqrt(6)
+    when 'U' then Math.sqrt(2)
+    when 'N' then 2
+    when 'S' then 'XPTO'
+      # TODO: Return k (provided as parameter) or compute it from v, when dominant is 'S' type (student's-T distribution)
+    end
+  end
+
   def self.inverse_t_95(v)
     # Determines k factor for an inverse Student's t distribution, with 95.45% coverage factor
-    #
     # TODO: Link this to statistics package (CRAN-R + RSERVE ?) to generalize this
 
     return 2 if v == Float::INFINITY
